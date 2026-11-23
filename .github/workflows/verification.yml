@@ -1,0 +1,66 @@
+name: Vérification sur Mac
+
+# Vérifie, sur une machine macOS de GitHub (gratuite pour un dépôt public) :
+#  1. les tests unitaires de la logique (CoreTests) ;
+#  2. que l'app Swift Playgrounds compile pour le simulateur iPad.
+on:
+  push:
+    paths:
+      - "AssistantComics.swiftpm/**"
+      - "CoreTests/**"
+      - ".github/workflows/verification.yml"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-tests:
+    name: Tests de la logique
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Choisir la version la plus récente de Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          swift --version
+      - name: Copier le code testé
+        run: cp AssistantComics.swiftpm/Core/*.swift CoreTests/Sources/ComicsCore/
+      - name: Lancer les tests
+        working-directory: CoreTests
+        run: swift test
+
+  app-build:
+    name: Compilation de l'app (simulateur iPad)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Choisir la version la plus récente de Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphonesimulator || true
+      - name: Lister les schémas
+        working-directory: AssistantComics.swiftpm
+        run: xcodebuild -list
+      - name: Compiler
+        working-directory: AssistantComics.swiftpm
+        run: |
+          xcodebuild build \
+            -scheme "Assistant Comics" \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            > "$RUNNER_TEMP/build.log" 2>&1 && STATUS=0 || STATUS=$?
+          echo "::group::Erreurs et avertissements"
+          grep -E "error:|warning:" "$RUNNER_TEMP/build.log" | sort -u | head -200 || true
+          echo "::endgroup::"
+          tail -40 "$RUNNER_TEMP/build.log"
+          exit $STATUS
