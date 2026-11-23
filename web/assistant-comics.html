@@ -1,0 +1,914 @@
+<title>Assistant Comics</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Comic+Neue:wght@700&display=swap">
+<style>
+/* Layout: a dark reading stage fills the screen under a slim top bar; the assistant floats over it as a movable panel (docked at the bottom on phones). */
+:root {
+  --paper: #eef1f6;
+  --surface: #ffffff;
+  --surface-2: #f4f6fa;
+  --ink: #161922;
+  --muted: #586174;
+  --line: #d6dce6;
+  --accent: #1f5fd6;
+  --accent-ink: #ffffff;
+  --highlight: #ffd23f;
+  --highlight-ink: #1b1600;
+  --stage: #2a2f3a;
+  --danger: #b3261e;
+  --shadow: 0 10px 30px rgba(16, 24, 40, 0.22);
+  --font-display: "Bangers", "Impact", "Arial Narrow", sans-serif;
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #11141a; --surface: #1a1e27; --surface-2: #222733; --ink: #e8ecf3; --muted: #9ba5b7;
+    --line: #2e3542; --accent: #6f9dff; --accent-ink: #0b1020; --highlight: #ffd23f; --highlight-ink: #1b1600;
+    --stage: #0b0d12; --danger: #ff8a80; --shadow: 0 10px 30px rgba(0, 0, 0, 0.55); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #11141a; --surface: #1a1e27; --surface-2: #222733; --ink: #e8ecf3; --muted: #9ba5b7;
+  --line: #2e3542; --accent: #6f9dff; --accent-ink: #0b1020; --highlight: #ffd23f; --highlight-ink: #1b1600;
+  --stage: #0b0d12; --danger: #ff8a80; --shadow: 0 10px 30px rgba(0, 0, 0, 0.55); color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.45; overflow: hidden; }
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: flex; flex-direction: column; }
+
+/* Top bar */
+.bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--surface); border-bottom: 1px solid var(--line); }
+.brand { font-family: var(--font-display); font-size: 26px; letter-spacing: 0.04em; line-height: 1; margin-right: 6px; white-space: nowrap; }
+.brand span { color: var(--accent); }
+.bar .spacer { flex: 1 1 auto; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.ghost { background: transparent; }
+.btn[disabled] { opacity: 0.45; cursor: default; }
+.btn.small { min-height: 32px; padding: 0 10px; font-size: 14px; }
+.icon-btn { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; }
+.icon-btn[aria-pressed="true"] { background: var(--highlight); color: var(--highlight-ink); border-color: var(--highlight); }
+.pager { display: inline-flex; align-items: center; gap: 6px; }
+.pager-label { min-width: 104px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
+.resume { font-size: 14px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Stage */
+.stage { position: relative; flex: 1 1 auto; min-height: 0; background: var(--stage); display: grid; place-items: center; overflow: hidden; touch-action: pan-y pinch-zoom; }
+.page-wrap { position: relative; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45); background: #fff; }
+.page-wrap canvas { display: block; width: 100%; height: 100%; }
+.sample-tag { position: absolute; left: 10px; bottom: 10px; background: var(--highlight); color: var(--highlight-ink); font-weight: 700; font-size: 13px; padding: 3px 10px; border-radius: 999px; letter-spacing: 0.02em; }
+.markers { position: absolute; inset: 0; pointer-events: none; }
+.marker-box { position: absolute; border: 2px solid rgba(31, 95, 214, 0.75); border-radius: 10px; pointer-events: auto; cursor: pointer; background: transparent; padding: 0; }
+.marker-box.selected { border: 3px solid var(--highlight); background: rgba(255, 210, 63, 0.16); }
+.marker-num { position: absolute; left: -12px; top: -12px; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 13px; background: #1f5fd6; color: #fff; font-family: var(--font-display); font-size: 17px; line-height: 26px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.marker-box.selected .marker-num { background: var(--highlight); color: var(--highlight-ink); }
+.stage-message { color: #e8ecf3; text-align: center; max-width: 420px; padding: 24px; }
+
+/* Floating panel */
+.panel { position: fixed; z-index: 20; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.panel-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.panel-head:active { cursor: grabbing; }
+.grip { width: 18px; height: 12px; background: radial-gradient(circle, var(--muted) 1.4px, transparent 1.6px) 0 0 / 6px 6px; opacity: 0.8; }
+.panel-title { font-family: var(--font-display); font-size: 21px; letter-spacing: 0.05em; }
+.panel-head .spacer { flex: 1; }
+.panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+.resize-handle { position: absolute; right: 0; bottom: 0; width: 26px; height: 26px; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--line) 50%, var(--line) 60%, transparent 60%, transparent 70%, var(--line) 70%, var(--line) 80%, transparent 80%); }
+.pill { position: fixed; z-index: 21; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); min-height: 52px; padding: 0 18px; border-radius: 26px; border: none; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-size: 21px; letter-spacing: 0.05em; box-shadow: var(--shadow); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.status { margin: 0; font-size: 14px; color: var(--muted); min-height: 1.2em; }
+.status.error { color: var(--danger); }
+.status:empty { display: none; }
+.note { margin: 0; font-size: 14px; color: var(--muted); }
+.example-note { margin: 0; font-size: 14px; background: var(--surface-2); border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; }
+.example-note strong { color: var(--ink); }
+
+.bubble-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bubble-item { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; text-align: left; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; }
+.bubble-item:hover { border-color: var(--accent); }
+.num { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-size: 18px; line-height: 1; }
+.num.hl { background: var(--highlight); color: var(--highlight-ink); }
+.bubble-text { min-width: 0; overflow-wrap: anywhere; }
+.chip { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+
+.detail { display: flex; flex-direction: column; gap: 10px; }
+.detail-nav { display: flex; align-items: center; gap: 6px; }
+.detail-nav .spacer { flex: 1; }
+.field-label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0; }
+textarea.en { width: 100%; min-height: 72px; resize: vertical; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); padding: 8px 10px; line-height: 1.4; box-sizing: border-box; }
+.fr { margin: 0; font-size: 18px; padding: 10px 12px; border-radius: 10px; background: var(--highlight); color: var(--highlight-ink); }
+.grammar { font-size: 15px; display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
+.grammar p { margin: 0; }
+.grammar ul { margin: 0; padding-left: 20px; }
+
+/* History sheet */
+.sheet-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(8, 10, 14, 0.5); display: flex; justify-content: flex-end; }
+.sheet { width: min(520px, 100%); height: 100%; background: var(--surface); display: flex; flex-direction: column; box-shadow: var(--shadow); padding-top: env(safe-area-inset-top, 0px); }
+.sheet-head { display: flex; align-items: center; gap: 8px; padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.sheet-head h2 { font-family: var(--font-display); font-weight: 400; font-size: 28px; letter-spacing: 0.04em; margin: 0; flex: 1; }
+.sheet-tools { display: flex; gap: 8px; padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); flex-wrap: wrap; align-items: center; }
+.search { flex: 1 1 200px; min-width: 0; min-height: 40px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); padding: 0 14px; }
+.sheet-list { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding-block: 4px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; }
+.entry { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; background: var(--surface-2); }
+.entry-en { font-weight: 700; margin: 0; overflow-wrap: anywhere; }
+.entry-fr { margin: 0; overflow-wrap: anywhere; }
+.entry-meta { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.entry-meta .spacer { flex: 1; }
+.entry details summary { cursor: pointer; color: var(--accent); font-weight: 700; font-size: 14px; }
+.link-btn { border: none; background: none; color: var(--danger); font-weight: 700; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+.export-box { width: 100%; min-height: 120px; box-sizing: border-box; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); padding: 8px; }
+.sync { font-size: 13px; color: var(--muted); }
+
+@media (max-width: 700px) {
+  .brand { font-size: 22px; }
+  .pager-label { min-width: 76px; }
+  .panel { left: 0 !important; right: 0 !important; width: auto !important; top: auto !important; bottom: 0 !important; height: 52% !important; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .panel-head { cursor: default; }
+  .resize-handle { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .panel, .pill { transition: box-shadow 0.2s ease; }
+}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand" aria-label="Assistant Comics">Assistant <span>Comics</span></div>
+    <label class="btn primary" for="file-input">Ouvrir un PDF</label>
+    <input id="file-input" class="visually-hidden" type="file" accept="application/pdf,.pdf">
+    <button id="resume-btn" class="btn ghost small resume" type="button" hidden></button>
+    <div class="spacer"></div>
+    <div class="pager">
+      <button id="prev-page" class="icon-btn" type="button" aria-label="Page précédente">‹</button>
+      <span id="page-label" class="pager-label">Exemple</span>
+      <button id="next-page" class="icon-btn" type="button" aria-label="Page suivante">›</button>
+    </div>
+    <button id="history-btn" class="btn" type="button">Historique</button>
+  </header>
+
+  <main id="stage" class="stage" aria-label="Page du comic">
+    <div id="page-wrap" class="page-wrap">
+      <canvas id="page-canvas" aria-label="Page affichée"></canvas>
+      <div id="markers" class="markers"></div>
+      <span id="sample-tag" class="sample-tag">Page d'exemple</span>
+    </div>
+  </main>
+</div>
+
+<section id="panel" class="panel" aria-label="Assistant">
+  <div id="panel-head" class="panel-head">
+    <span class="grip" aria-hidden="true"></span>
+    <span class="panel-title">Assistant</span>
+    <span class="spacer"></span>
+    <button id="markers-toggle" class="icon-btn" type="button" aria-pressed="true" aria-label="Afficher les numéros sur la page">#</button>
+    <button id="collapse-btn" class="icon-btn" type="button" aria-label="Réduire l'assistant">–</button>
+  </div>
+  <div id="panel-body" class="panel-body">
+    <div class="actions">
+      <button id="analyze-btn" class="btn primary" type="button">Analyser la page</button>
+      <button id="stop-btn" class="btn" type="button" hidden>Arrêter</button>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <div id="list-view"></div>
+    <div id="detail-view" class="detail" hidden></div>
+  </div>
+  <div id="resize-handle" class="resize-handle" aria-hidden="true"></div>
+</section>
+<button id="pill" class="pill" type="button" hidden>
+  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3C6.5 3 2 6.6 2 11c0 2.4 1.3 4.5 3.4 6l-1 4 4.3-2.4c1 .3 2.1.4 3.3.4 5.5 0 10-3.6 10-8s-4.5-8-10-8z"/></svg>
+  Assistant
+</button>
+
+<div id="history-backdrop" class="sheet-backdrop" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="history-title">
+    <div class="sheet-head">
+      <h2 id="history-title">Historique</h2>
+      <button id="history-close" class="btn" type="button">Fermer</button>
+    </div>
+    <div class="sheet-tools">
+      <label class="visually-hidden" for="history-search">Rechercher</label>
+      <input id="history-search" class="search" type="search" placeholder="Rechercher une réplique">
+      <button id="history-copy" class="btn small" type="button">Copier tout</button>
+      <span id="history-sync" class="sync"></span>
+    </div>
+    <div id="history-export" hidden style="padding: 0 16px 8px;">
+      <label class="field-label" for="export-text">Texte à copier</label>
+      <textarea id="export-text" class="export-box" readonly></textarea>
+    </div>
+    <ul id="history-list" class="sheet-list"></ul>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  const $ = (sel) => document.querySelector(sel);
+  const PDFJS_WORKER = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  const KINDS = { dialogue: "Bulle", thought: "Pensée", caption: "Récitatif", sfx: "Onomatopée" };
+
+  // ---------- Petit stockage local (confort par appareil) ----------
+  const local = {
+    get(key, fallback) { try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); } catch (e) { return fallback; } },
+    set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* stockage indisponible */ } }
+  };
+
+  const escapeHTML = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fnv = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16); };
+  const normText = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+  // ---------- Page d'exemple (dessinée, textes originaux) ----------
+  const SAMPLE_W = 1000, SAMPLE_H = 1500;
+  const SAMPLE_BUBBLES = [
+    { n: 1, kind: "dialogue", en: "Where did he go? He was right here a second ago!", fr: "Où est-il passé ? Il était juste là il y a une seconde !", box: [0.07, 0.065, 0.47, 0.215] },
+    { n: 2, kind: "dialogue", en: "I'm gonna check the alley. You watch the roof!", fr: "Je vais vérifier la ruelle. Toi, surveille le toit !", box: [0.55, 0.09, 0.93, 0.225] },
+    { n: 3, kind: "caption", en: "Meanwhile, down below...", fr: "Pendant ce temps, en contrebas…", box: [0.06, 0.415, 0.43, 0.465] },
+    { n: 4, kind: "thought", en: "They'll never find me down here.", fr: "Ils ne me trouveront jamais ici, en bas.", box: [0.07, 0.5, 0.45, 0.63] },
+    { n: 5, kind: "sfx", en: "Krak!", fr: "Crac !", box: [0.58, 0.44, 0.9, 0.53] },
+    { n: 6, kind: "dialogue", en: "What was that?!", fr: "C'était quoi, ça ?!", box: [0.56, 0.6, 0.9, 0.69] }
+  ];
+
+  function wrapLines(ctx, text, maxWidth) {
+    const words = text.split(" "); const lines = []; let line = "";
+    for (const w of words) { const test = line ? line + " " + w : w; if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w; } else { line = test; } }
+    if (line) lines.push(line); return lines;
+  }
+  function drawBubbleText(ctx, text, cx, cy, maxW, size) {
+    ctx.font = `700 ${size}px "Comic Neue", "Comic Sans MS", "Chalkboard SE", sans-serif`;
+    ctx.fillStyle = "#111"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const lines = wrapLines(ctx, text.toUpperCase(), maxW); const lh = size * 1.15;
+    lines.forEach((l, i) => ctx.fillText(l, cx, cy + (i - (lines.length - 1) / 2) * lh));
+  }
+  function balloon(ctx, x, y, w, h, tailX, tailY) {
+    ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#111"; ctx.stroke();
+    if (tailX != null) { ctx.beginPath(); ctx.moveTo(x + w * 0.45, y + h * 0.92); ctx.lineTo(tailX, tailY); ctx.lineTo(x + w * 0.6, y + h * 0.9); ctx.fillStyle = "#fff"; ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 - 3, h / 2 - 3, 0, 0, Math.PI * 2); ctx.fill(); }
+  }
+  function drawSample(ctx, W, H) {
+    const s = W / SAMPLE_W; ctx.save(); ctx.scale(s, H / SAMPLE_H);
+    ctx.fillStyle = "#fdfdfb"; ctx.fillRect(0, 0, SAMPLE_W, SAMPLE_H);
+    // Case 1 : toit de nuit
+    let g = ctx.createLinearGradient(0, 40, 0, 560); g.addColorStop(0, "#1c2b52"); g.addColorStop(1, "#4b5f9a");
+    ctx.fillStyle = g; ctx.fillRect(40, 40, 920, 520);
+    ctx.fillStyle = "#f3e6a5"; ctx.beginPath(); ctx.arc(860, 120, 42, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#121a33"; [[40, 380, 140, 180], [190, 330, 110, 230], [320, 400, 160, 160], [500, 350, 120, 210], [640, 410, 140, 150], [800, 370, 160, 190]].forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
+    ctx.fillStyle = "#2b2f3a"; ctx.fillRect(40, 500, 920, 60);
+    ctx.fillStyle = "#c0392b"; ctx.beginPath(); ctx.arc(300, 420, 26, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(282, 444, 36, 60);
+    ctx.fillStyle = "#16a085"; ctx.beginPath(); ctx.arc(700, 425, 24, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(684, 447, 32, 56);
+    balloon(ctx, 70, 95, 400, 225, 290, 390); drawBubbleText(ctx, "Where did he go? He was right here a second ago!", 270, 205, 290, 30);
+    balloon(ctx, 550, 135, 380, 205, 700, 395); drawBubbleText(ctx, "I'm gonna check the alley. You watch the roof!", 740, 237, 270, 30);
+    ctx.lineWidth = 6; ctx.strokeStyle = "#111"; ctx.strokeRect(40, 40, 920, 520);
+    // Case 2 : la ruelle
+    g = ctx.createLinearGradient(0, 600, 0, 1460); g.addColorStop(0, "#3b3f47"); g.addColorStop(1, "#191b20");
+    ctx.fillStyle = g; ctx.fillRect(40, 600, 440, 860);
+    ctx.fillStyle = "#6b4f2a"; ctx.fillRect(90, 1150, 140, 110); ctx.fillStyle = "#7d8597"; ctx.fillRect(300, 1180, 120, 80);
+    ctx.fillStyle = "#8e44ad"; ctx.beginPath(); ctx.arc(330, 1030, 30, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(308, 1058, 44, 90);
+    ctx.fillStyle = "#ffd23f"; ctx.fillRect(60, 622, 370, 76); ctx.lineWidth = 3; ctx.strokeStyle = "#111"; ctx.strokeRect(60, 622, 370, 76);
+    drawBubbleText(ctx, "Meanwhile, down below...", 245, 660, 340, 28);
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#111"; ctx.lineWidth = 4;
+    [[160, 820, 70], [260, 800, 80], [360, 830, 65], [210, 880, 75], [320, 885, 70]].forEach(([x, y, r]) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
+    [[160, 820, 66], [260, 800, 76], [360, 830, 61], [210, 880, 71], [320, 885, 66]].forEach(([x, y, r]) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); });
+    [[300, 960, 12], [318, 990, 8]].forEach(([x, y, r]) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
+    drawBubbleText(ctx, "They'll never find me down here.", 262, 848, 280, 27);
+    ctx.lineWidth = 6; ctx.strokeStyle = "#111"; ctx.strokeRect(40, 600, 440, 860);
+    // Case 3 : le bruit
+    ctx.fillStyle = "#e9e3d5"; ctx.fillRect(520, 600, 440, 860);
+    ctx.fillStyle = "#5d6d7e"; ctx.fillRect(520, 1240, 440, 220);
+    ctx.save(); ctx.translate(740, 735); ctx.rotate(-0.12);
+    ctx.font = '400 120px "Bangers", Impact, sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 10; ctx.strokeStyle = "#111"; ctx.strokeText("KRAK!", 0, 0); ctx.fillStyle = "#e67e22"; ctx.fillText("KRAK!", 0, 0); ctx.restore();
+    balloon(ctx, 560, 895, 340, 145, 700, 1090); drawBubbleText(ctx, "What was that?!", 730, 967, 260, 32);
+    ctx.fillStyle = "#16a085"; ctx.beginPath(); ctx.arc(700, 1140, 28, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(680, 1166, 40, 74);
+    ctx.lineWidth = 6; ctx.strokeStyle = "#111"; ctx.strokeRect(520, 600, 440, 860);
+    ctx.restore();
+  }
+
+  // ---------- État ----------
+  const state = {
+    source: "sample", pdf: null, fileName: "", fileKey: "sample", pageCount: 1, pageIndex: 0,
+    analyses: {}, selected: null, edits: {}, retranslations: {}, grammar: {}, listScroll: 0,
+    showMarkers: local.get("ac.markers", true), busy: false, controller: null
+  };
+  state.analyses["sample#0"] = { bubbles: SAMPLE_BUBBLES, example: true };
+  const pageKey = () => `${state.fileKey}#${state.pageIndex}`;
+  const currentAnalysis = () => state.analyses[pageKey()] || null;
+  const bubbleKey = (b) => `${pageKey()}#${b.n}`;
+
+  // ---------- Capacités Claude ----------
+  const C = window.claude;
+  let samplePromise = null;
+  function getSample() {
+    if (!C || typeof C.use !== "function") return Promise.resolve(null);
+    if (!samplePromise) samplePromise = C.use("sample").catch(() => null);
+    return samplePromise;
+  }
+  function errorCopy(e) {
+    const code = e && e.code;
+    switch (code) {
+      case "not_granted": return "Vous n'avez pas autorisé cette page à utiliser Claude. Rechargez la page pour qu'elle vous le redemande.";
+      case "sampling_disabled": return "Claude n'est pas disponible pour ce compte.";
+      case "images_unavailable": return "Cette vue ne permet pas d'envoyer l'image de la page à Claude. Ouvrez la page dans claude.ai ou dans l'app Claude.";
+      case "image_rejected": return "L'image de la page a été refusée (trop grande ou illisible). Essayez une autre page.";
+      case "rate_limited": return e.reason === "usage_limit" ? "Votre limite d'utilisation de Claude est atteinte. Réessayez plus tard." : "Trop de demandes à la suite. Patientez un moment avant de réessayer.";
+      case "session_expired": return "Votre session a expiré : reconnectez-vous à Claude puis réessayez.";
+      case "refused": return "Claude n'a pas pu traiter cette demande.";
+      case "invalid_json": return "La réponse de Claude était incomplète. Appuyez de nouveau pour réessayer.";
+      case "empty_completion": return "Claude n'a rien renvoyé. Réessayez.";
+      default: return "La connexion avec Claude a été interrompue. Réessayez.";
+    }
+  }
+
+  // ---------- Rendu de la page ----------
+  const stage = $("#stage"), wrap = $("#page-wrap"), canvas = $("#page-canvas"), markers = $("#markers");
+  let renderTask = null, renderSeq = 0;
+
+  async function renderPage() {
+    const seq = ++renderSeq;
+    const availW = Math.max(120, stage.clientWidth - 24), availH = Math.max(120, stage.clientHeight - 24);
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    $("#sample-tag").hidden = state.source !== "sample";
+    if (state.source === "sample") {
+      const fit = Math.min(availW / SAMPLE_W, availH / SAMPLE_H);
+      const w = Math.floor(SAMPLE_W * fit), h = Math.floor(SAMPLE_H * fit);
+      canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
+      wrap.style.width = w + "px"; wrap.style.height = h + "px";
+      drawSample(canvas.getContext("2d"), canvas.width, canvas.height);
+    } else {
+      const page = await state.pdf.getPage(state.pageIndex + 1);
+      if (seq !== renderSeq) return;
+      const base = page.getViewport({ scale: 1 });
+      const fit = Math.min(availW / base.width, availH / base.height);
+      const w = Math.floor(base.width * fit), h = Math.floor(base.height * fit);
+      const viewport = page.getViewport({ scale: fit * dpr });
+      if (renderTask) { try { renderTask.cancel(); } catch (e) { /* déjà terminé */ } }
+      canvas.width = Math.floor(viewport.width); canvas.height = Math.floor(viewport.height);
+      wrap.style.width = w + "px"; wrap.style.height = h + "px";
+      const ctx = canvas.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      renderTask = page.render({ canvasContext: ctx, viewport });
+      try { await renderTask.promise; } catch (e) { if (e && e.name === "RenderingCancelledException") return; throw e; }
+    }
+    renderMarkers();
+  }
+
+  function renderMarkers() {
+    markers.innerHTML = "";
+    const a = currentAnalysis();
+    if (!a || !state.showMarkers) return;
+    for (const b of a.bubbles) {
+      if (!b.box) continue;
+      const [x0, y0, x1, y1] = b.box;
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "marker-box" + (b.n === state.selected ? " selected" : "");
+      el.style.left = (x0 * 100) + "%"; el.style.top = (y0 * 100) + "%";
+      el.style.width = Math.max(2, (x1 - x0) * 100) + "%"; el.style.height = Math.max(2, (y1 - y0) * 100) + "%";
+      el.setAttribute("aria-label", `Bulle ${b.n}`);
+      el.innerHTML = `<span class="marker-num">${b.n}</span>`;
+      el.addEventListener("click", (ev) => { ev.stopPropagation(); selectBubble(b.n); });
+      markers.appendChild(el);
+    }
+  }
+
+  function updatePager() {
+    const label = $("#page-label");
+    label.textContent = state.source === "sample" ? "Page d'exemple" : `Page ${state.pageIndex + 1} / ${state.pageCount}`;
+    $("#prev-page").disabled = state.source === "sample" || state.pageIndex <= 0;
+    $("#next-page").disabled = state.source === "sample" || state.pageIndex >= state.pageCount - 1;
+  }
+
+  function goToPage(index) {
+    if (state.source !== "pdf") return;
+    const next = Math.min(Math.max(0, index), state.pageCount - 1);
+    if (next === state.pageIndex) return;
+    if (state.controller) state.controller.abort();
+    state.pageIndex = next; state.selected = null; state.listScroll = 0;
+    const last = local.get("ac.lastPages", {}); last[state.fileKey] = next; local.set("ac.lastPages", last);
+    updatePager(); renderPanel(); renderPage().catch(showRenderError);
+  }
+
+  function showRenderError(e) { setStatus("Cette page n'a pas pu être affichée.", true); console.error(e); }
+
+  // ---------- Ouverture d'un PDF ----------
+  async function openFile(file) {
+    if (!file) return;
+    if (!window.pdfjsLib) { setStatus("Le lecteur PDF n'a pas pu se charger. Vérifiez la connexion puis rechargez la page.", true); return; }
+    setStatus(`Ouverture de « ${file.name} »…`);
+    try {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      const data = new Uint8Array(await file.arrayBuffer());
+      const pdf = await window.pdfjsLib.getDocument({ data, isEvalSupported: false }).promise;
+      if (state.pdf) { try { state.pdf.destroy(); } catch (e) { /* ignoré */ } }
+      if (state.controller) state.controller.abort();
+      state.pdf = pdf; state.source = "pdf"; state.fileName = file.name.replace(/\.pdf$/i, "");
+      state.fileKey = "f-" + fnv(file.name + ":" + file.size); state.pageCount = pdf.numPages;
+      const last = local.get("ac.lastPages", {});
+      state.pageIndex = Math.min(Math.max(0, last[state.fileKey] || 0), pdf.numPages - 1);
+      state.selected = null;
+      const saved = local.get("ac.analyses." + state.fileKey, {});
+      for (const k of Object.keys(saved)) state.analyses[k] = saved[k];
+      setStatus("");
+      updatePager(); renderPanel(); await renderPage();
+      rememberFile(file);
+      $("#resume-btn").hidden = true;
+    } catch (e) {
+      console.error(e);
+      setStatus("Ce fichier n'a pas pu être lu comme un PDF.", true);
+    }
+  }
+
+  // Dernier PDF gardé sur cet appareil (IndexedDB), pour le rouvrir d'un geste.
+  function idb() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("assistant-comics", 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("files");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function rememberFile(file) {
+    try {
+      if (file.size > 200 * 1024 * 1024) return;
+      const db = await idb();
+      const tx = db.transaction("files", "readwrite");
+      tx.objectStore("files").put({ blob: file, name: file.name, type: file.type || "application/pdf" }, "last");
+    } catch (e) { /* stockage indisponible */ }
+  }
+  async function offerResume() {
+    try {
+      const db = await idb();
+      const rec = await new Promise((resolve, reject) => {
+        const req = db.transaction("files", "readonly").objectStore("files").get("last");
+        req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+      });
+      if (!rec || !rec.blob || state.source === "pdf") return;
+      const btn = $("#resume-btn");
+      btn.textContent = `Reprendre « ${rec.name.replace(/\.pdf$/i, "")} »`;
+      btn.hidden = false;
+      btn.onclick = () => openFile(new File([rec.blob], rec.name, { type: rec.type }));
+    } catch (e) { /* rien à reprendre */ }
+  }
+
+  // ---------- Analyse par Claude ----------
+  function buildPrompt(split) {
+    const imagesLine = split
+      ? "Image 1 shows the TOP of one comic page (from 0% to 55% of its height). Image 2 shows the BOTTOM of the same page (from 45% to 100%). The two images overlap."
+      : "The image shows one whole comic page.";
+    return [
+      "You help a French-speaking adult learn English by reading comics.",
+      imagesLine,
+      "Find every speech balloon, thought balloon, caption box and sound effect that contains English text.",
+      "List each one ONCE, in natural reading order for the whole page: panel by panel, rows of panels from top to bottom, left to right inside a row; inside a panel, left to right then top to bottom.",
+      split
+        ? "For each one give img = the image (1 or 2) where it is fully visible, and box = its bounding box in THAT image as integers from 0 to 1000: [left, top, right, bottom], measured from the image's top-left corner."
+        : "For each one give img = 1 and box = its bounding box as integers from 0 to 1000: [left, top, right, bottom], measured from the image's top-left corner.",
+      "en = the exact English text, written in normal sentence case (comics are lettered in capitals: use normal capitalization, keep names capitalized, rejoin words split across lines).",
+      "fr = a natural French translation that keeps the tone.",
+      "kind = dialogue, thought, caption or sfx.",
+      'Reply with only JSON in this shape: {"bubbles":[{"n":1,"img":1,"box":[120,40,480,210],"kind":"dialogue","en":"...","fr":"..."}]}',
+      'If the page has no English text, reply {"bubbles":[]}.'
+    ].join("\n");
+  }
+
+  function iou(a, b) {
+    const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]));
+    const iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+    const inter = ix * iy; const ua = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter;
+    return ua > 0 ? inter / ua : 0;
+  }
+
+  function normalizeBubbles(data, split) {
+    const raw = Array.isArray(data) ? data : (data && Array.isArray(data.bubbles) ? data.bubbles : []);
+    const items = [];
+    raw.forEach((b, i) => {
+      if (!b || typeof b.en !== "string" || !b.en.trim()) return;
+      let box = null;
+      if (Array.isArray(b.box) && b.box.length === 4 && b.box.every((v) => Number.isFinite(Number(v)))) {
+        let [x0, y0, x1, y1] = b.box.map((v) => Math.min(1000, Math.max(0, Number(v))) / 1000);
+        if (x1 < x0) [x0, x1] = [x1, x0];
+        if (y1 < y0) [y0, y1] = [y1, y0];
+        if (split) { const off = Number(b.img) === 2 ? 0.45 : 0; y0 = off + y0 * 0.55; y1 = off + y1 * 0.55; }
+        if (x1 - x0 > 0.005 && y1 - y0 > 0.005) box = [x0, y0, x1, y1];
+      }
+      items.push({ order: Number(b.n) || i + 1, kind: KINDS[b.kind] ? b.kind : "dialogue", en: b.en.trim(), fr: typeof b.fr === "string" ? b.fr.trim() : "", box });
+    });
+    items.sort((a, b) => a.order - b.order);
+    const kept = [];
+    for (const it of items) {
+      const dup = kept.some((k) => normText(k.en) === normText(it.en) || (k.box && it.box && iou(k.box, it.box) > 0.6));
+      if (!dup) kept.push(it);
+    }
+    return kept.map((it, i) => ({ n: i + 1, kind: it.kind, en: it.en, fr: it.fr, box: it.box }));
+  }
+
+  async function pageImage(longSide) {
+    const c = document.createElement("canvas");
+    if (state.source === "sample") {
+      c.width = Math.round(longSide * SAMPLE_W / SAMPLE_H); c.height = longSide;
+      drawSample(c.getContext("2d"), c.width, c.height);
+      return c;
+    }
+    const page = await state.pdf.getPage(state.pageIndex + 1);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: longSide / Math.max(base.width, base.height) });
+    c.width = Math.floor(viewport.width); c.height = Math.floor(viewport.height);
+    const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return c;
+  }
+
+  function crop(src, from, to) {
+    const y = Math.round(from * src.height), h = Math.round((to - from) * src.height);
+    const c = document.createElement("canvas"); c.width = src.width; c.height = h;
+    c.getContext("2d").drawImage(src, 0, y, src.width, h, 0, 0, src.width, h);
+    return new Promise((resolve, reject) => c.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("toBlob"))), "image/jpeg", 0.9));
+  }
+
+  async function analyzePage() {
+    if (state.busy) return;
+    const sample = await getSample();
+    if (!sample) { setStatus("L'analyse fonctionne quand cette page est ouverte dans claude.ai ou dans l'app Claude.", true); return; }
+    const limits = await sample.limits().catch(() => null);
+    if (!limits || !limits.images) { setStatus(errorCopy({ code: "images_unavailable" }), true); return; }
+    const split = (limits.images.maxCount || 1) >= 2;
+    const key = pageKey();
+    const controller = new AbortController();
+    state.controller = controller; state.busy = true; state.selected = null;
+    setBusy(true); setStatus("Claude lit la page… (souvent 10 à 60 secondes)");
+    try {
+      const img = await pageImage(split ? 2600 : 2000);
+      const images = split ? [await crop(img, 0, 0.55), await crop(img, 0.45, 1)] : [await crop(img, 0, 1)];
+      if (controller.signal.aborted) throw { code: "cancelled" };
+      const data = await sample.json(buildPrompt(split), { images, modelTier: "default", effort: "low", signal: controller.signal });
+      const bubbles = normalizeBubbles(data, split);
+      state.analyses[key] = { bubbles, at: Date.now() };
+      saveAnalyses();
+      if (key === pageKey()) setStatus(bubbles.length ? "" : "Aucun texte trouvé sur cette page.");
+    } catch (e) {
+      if (key === pageKey()) setStatus(e && e.code === "cancelled" ? "Analyse arrêtée." : errorCopy(e), !(e && e.code === "cancelled"));
+    } finally {
+      if (state.controller === controller) state.controller = null;
+      state.busy = false; setBusy(false);
+      renderPanel(); renderMarkers();
+    }
+  }
+
+  function saveAnalyses() {
+    if (state.source !== "pdf") return;
+    const mine = {};
+    for (const [k, v] of Object.entries(state.analyses)) if (k.startsWith(state.fileKey + "#") && !v.example) mine[k] = v;
+    local.set("ac.analyses." + state.fileKey, mine);
+  }
+
+  // ---------- Panneau ----------
+  function setStatus(text, isError) { const el = $("#status"); el.textContent = text || ""; el.classList.toggle("error", !!isError); }
+  function setBusy(busy) { $("#analyze-btn").disabled = busy; $("#stop-btn").hidden = !busy; }
+
+  function renderPanel() {
+    const a = currentAnalysis();
+    $("#analyze-btn").textContent = a && !a.example ? "Analyser à nouveau" : "Analyser la page";
+    const listView = $("#list-view"), detailView = $("#detail-view");
+    const bubble = a && state.selected != null ? a.bubbles.find((b) => b.n === state.selected) : null;
+    if (bubble) { listView.hidden = true; detailView.hidden = false; renderDetail(a, bubble); return; }
+    detailView.hidden = true; listView.hidden = false;
+    let html = "";
+    if (a && a.example) html += `<p class="example-note"><strong>Exemple.</strong> Cette page de démonstration est déjà analysée. Touchez une bulle pour voir sa traduction, ou ouvrez votre propre PDF.</p>`;
+    if (!a) {
+      html += `<p class="note">Appuyez sur « Analyser la page » : Claude lit les bulles, les numérote dans l'ordre de lecture et les traduit. L'image de la page n'est envoyée qu'à ce moment-là.</p>`;
+    } else if (!a.bubbles.length) {
+      html += `<p class="note">Aucune bulle sur cette page.</p>`;
+    } else {
+      html += `<ol class="bubble-list">` + a.bubbles.map((b) => `
+        <li><button type="button" class="bubble-item" data-n="${b.n}">
+          <span class="num">${b.n}</span>
+          <span class="bubble-text"><span class="chip">${KINDS[b.kind] || "Bulle"}</span><br>${escapeHTML(b.en)}</span>
+        </button></li>`).join("") + `</ol>`;
+    }
+    listView.innerHTML = html;
+    listView.querySelectorAll(".bubble-item").forEach((el) => el.addEventListener("click", () => selectBubble(Number(el.dataset.n))));
+    $("#panel-body").scrollTop = state.listScroll;
+  }
+
+  function selectBubble(n) {
+    const a = currentAnalysis(); if (!a) return;
+    const b = a.bubbles.find((x) => x.n === n); if (!b) return;
+    if (state.selected == null) state.listScroll = $("#panel-body").scrollTop;
+    state.selected = n;
+    showPanel();
+    renderPanel(); renderMarkers();
+    $("#panel-body").scrollTop = 0;
+    if (!a.example) recordHistory(b);
+  }
+
+  function renderDetail(a, b) {
+    const key = bubbleKey(b);
+    const en = state.edits[key] ?? b.en;
+    const fr = state.retranslations[key] ?? b.fr;
+    const idx = a.bubbles.indexOf(b);
+    const view = $("#detail-view");
+    view.innerHTML = `
+      <div class="detail-nav">
+        <button id="back-btn" class="btn small" type="button">‹ Toutes les bulles</button>
+        <span class="spacer"></span>
+        <button id="prev-b" class="icon-btn" type="button" aria-label="Bulle précédente" ${idx <= 0 ? "disabled" : ""}>↑</button>
+        <span class="num hl">${b.n}</span>
+        <button id="next-b" class="icon-btn" type="button" aria-label="Bulle suivante" ${idx >= a.bubbles.length - 1 ? "disabled" : ""}>↓</button>
+      </div>
+      <span class="chip">${KINDS[b.kind] || "Bulle"}</span>
+      <label class="field-label" for="en-text">Anglais</label>
+      <textarea id="en-text" class="en" rows="3" spellcheck="false">${escapeHTML(en)}</textarea>
+      <div><button id="retranslate-btn" class="btn small" type="button" ${en === b.en && !state.retranslations[key] ? "hidden" : ""}>Retraduire le texte corrigé</button></div>
+      <p class="field-label">Français</p>
+      <p id="fr-text" class="fr">${fr ? escapeHTML(fr) : "—"}</p>
+      <p class="field-label">Grammaire</p>
+      <div id="grammar-box" class="grammar"></div>`;
+    $("#back-btn").onclick = () => { state.selected = null; renderPanel(); renderMarkers(); };
+    $("#prev-b").onclick = () => selectBubble(a.bubbles[idx - 1].n);
+    $("#next-b").onclick = () => selectBubble(a.bubbles[idx + 1].n);
+    const ta = $("#en-text");
+    ta.addEventListener("input", () => { state.edits[key] = ta.value; $("#retranslate-btn").hidden = false; });
+    $("#retranslate-btn").onclick = () => retranslate(a, b);
+    renderGrammar(b);
+  }
+
+  function renderGrammar(b) {
+    const box = $("#grammar-box"); if (!box) return;
+    const g = state.grammar[bubbleKey(b)];
+    if (!g) {
+      box.innerHTML = `<div><button id="grammar-btn" class="btn" type="button">Expliquer la grammaire</button></div>`;
+      $("#grammar-btn").onclick = () => explainGrammar(b);
+      return;
+    }
+    let html = g.text ? markdown(g.text) : "";
+    if (g.status === "loading") html += `<p class="note">Claude prépare l'explication…</p>`;
+    if (g.status === "error") html += `<p class="status error">${escapeHTML(g.error)}</p><div><button id="grammar-btn" class="btn small" type="button">Réessayer</button></div>`;
+    if (g.status === "loading" || g.status === "streaming") html += `<div><button id="grammar-stop" class="btn small" type="button">Arrêter</button></div>`;
+    box.innerHTML = html;
+    const retry = $("#grammar-btn"); if (retry) retry.onclick = () => explainGrammar(b);
+    const stop = $("#grammar-stop"); if (stop) stop.onclick = () => { if (g.controller) g.controller.abort(); };
+  }
+
+  function markdown(text) {
+    const lines = escapeHTML(text).split(/\n/);
+    let html = "", inList = false;
+    const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g, "$1<em>$2</em>");
+    for (let line of lines) {
+      line = line.trim();
+      const item = /^([-•*]|\d+[.)])\s+(.*)$/.exec(line);
+      if (item) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${inline(item[2])}</li>`; continue; }
+      if (inList) { html += "</ul>"; inList = false; }
+      if (!line) continue;
+      const head = /^#{1,6}\s+(.*)$/.exec(line);
+      html += head ? `<p><strong>${inline(head[1])}</strong></p>` : `<p>${inline(line)}</p>`;
+    }
+    if (inList) html += "</ul>";
+    return html;
+  }
+
+  async function explainGrammar(b) {
+    const key = bubbleKey(b);
+    const sample = await getSample();
+    if (!sample) { state.grammar[key] = { status: "error", text: "", error: "L'explication fonctionne quand cette page est ouverte dans claude.ai ou dans l'app Claude." }; renderGrammar(b); return; }
+    const en = state.edits[key] ?? b.en;
+    const fr = state.retranslations[key] ?? b.fr;
+    const controller = new AbortController();
+    const g = { status: "loading", text: "", controller };
+    state.grammar[key] = g; renderGrammar(b);
+    const prompt = [
+      "Tu es un professeur d'anglais bienveillant. Ton élève est un adulte francophone de niveau intermédiaire qui lit des comics en anglais.",
+      `Réplique : « ${en} »`,
+      fr ? `Traduction proposée : « ${fr} »` : "",
+      "Explique en français, en 12 lignes au maximum, avec ces quatre parties en gras :",
+      "**Sens** : ce que dit la réplique, en une phrase.",
+      "**Temps et constructions** : chaque temps ou construction verbale (nom français + forme anglaise citée).",
+      "**Expressions et oral** : contractions, argot (gonna, wanna…), expressions idiomatiques et leur sens.",
+      "**À retenir** : un point de grammaire avec un court exemple anglais traduit.",
+      "Utilise des listes à puces courtes. N'invente rien sur l'histoire."
+    ].filter(Boolean).join("\n");
+    try {
+      const { text } = await sample(prompt, {
+        modelTier: "default", effort: "low", signal: controller.signal,
+        onText: ({ text }) => { g.status = "streaming"; g.text = text; if (state.grammar[key] === g && isShowing(b)) renderGrammar(b); }
+      });
+      g.status = "done"; g.text = text;
+      attachGrammar(en, text);
+    } catch (e) {
+      if (e && e.code === "cancelled") { if (e.text) { g.status = "done"; g.text = e.text; } else { delete state.grammar[key]; } }
+      else { g.status = "error"; g.text = e && e.text ? e.text : ""; g.error = errorCopy(e); }
+    }
+    if (isShowing(b)) renderGrammar(b);
+  }
+
+  async function retranslate(a, b) {
+    const key = bubbleKey(b);
+    const en = (state.edits[key] ?? b.en).trim(); if (!en) return;
+    const sample = await getSample();
+    if (!sample) { setStatus("La traduction fonctionne quand cette page est ouverte dans claude.ai ou dans l'app Claude.", true); return; }
+    $("#fr-text").textContent = "Traduction…";
+    try {
+      const { text } = await sample(`Traduis en français naturel cette réplique de comic écrite en anglais, en gardant le ton. Réponds uniquement par la traduction, sans guillemets.\n\n${en}`, { modelTier: "quick" });
+      state.retranslations[key] = text.trim();
+      delete state.grammar[key];
+      if (!a.example) recordHistory(b);
+    } catch (e) { setStatus(errorCopy(e), true); }
+    if (isShowing(b)) renderPanel();
+  }
+
+  const isShowing = (b) => currentAnalysis() && state.selected === b.n && currentAnalysis().bubbles.includes(b);
+
+  // ---------- Historique ----------
+  const journal = { entries: local.get("ac.history", []), col: null, account: false, writes: {} };
+
+  async function initHistory() {
+    if (!C || typeof C.use !== "function") { renderHistory(); return; }
+    try {
+      const [db, user] = await Promise.all([C.use("db"), C.use("user")]);
+      const uid = user ? await user.id() : null;
+      if (!db || !uid) { renderHistory(); return; }
+      const col = db.collection("data/users/" + uid);
+      journal.col = col;
+      col.orderBy("date", "desc").limit(500).onSnapshot((snap) => {
+        journal.account = true;
+        journal.entries = snap.docs.map((d) => Object.assign({ id: d.id }, d.data())).filter((e) => e.type === "entry");
+        renderHistory();
+      }, () => { journal.col = null; journal.account = false; journal.entries = local.get("ac.history", []); renderHistory(); });
+    } catch (e) { renderHistory(); }
+  }
+
+  function queueWrite(id, fn) {
+    const prev = journal.writes[id] || Promise.resolve();
+    const next = prev.then(fn).catch(() => {});
+    journal.writes[id] = next;
+    return next;
+  }
+
+  function recordHistory(b) {
+    const key = bubbleKey(b);
+    const en = (state.edits[key] ?? b.en).trim();
+    const fr = (state.retranslations[key] ?? b.fr).trim();
+    if (!en) return;
+    const id = "e-" + fnv(en.toLowerCase());
+    const existing = journal.entries.find((e) => e.id === id);
+    const entry = { type: "entry", date: Date.now(), comic: state.fileName || "PDF", page: state.pageIndex + 1, en, fr, grammar: existing && existing.grammar ? existing.grammar : "" };
+    if (journal.col) {
+      const col = journal.col;
+      queueWrite(id, () => col.doc(id).set(entry));
+    } else {
+      journal.entries = [Object.assign({ id }, entry)].concat(journal.entries.filter((e) => e.id !== id)).slice(0, 500);
+      local.set("ac.history", journal.entries);
+      renderHistory();
+    }
+  }
+
+  function attachGrammar(en, grammar) {
+    const id = "e-" + fnv(en.trim().toLowerCase());
+    if (journal.col) {
+      const col = journal.col;
+      queueWrite(id, async () => { const snap = await col.doc(id).get(); if (snap.exists) await col.doc(id).update({ grammar }); });
+    } else {
+      const e = journal.entries.find((x) => x.id === id);
+      if (e) { e.grammar = grammar; local.set("ac.history", journal.entries); renderHistory(); }
+    }
+  }
+
+  function deleteEntry(id) {
+    if (journal.col) { const col = journal.col; queueWrite(id, () => col.doc(id).delete()); }
+    else { journal.entries = journal.entries.filter((e) => e.id !== id); local.set("ac.history", journal.entries); renderHistory(); }
+  }
+
+  function historyText(list) {
+    return list.map((e) => `« ${e.en} »\n→ ${e.fr}\n(${e.comic}, p. ${e.page}, ${new Date(e.date).toLocaleDateString("fr-FR")})` + (e.grammar ? `\n${e.grammar}` : "")).join("\n\n");
+  }
+
+  function filteredEntries() {
+    const q = $("#history-search").value.trim().toLowerCase();
+    return q ? journal.entries.filter((e) => (e.en + " " + e.fr).toLowerCase().includes(q)) : journal.entries;
+  }
+
+  function renderHistory() {
+    $("#history-sync").textContent = journal.account ? "Enregistré avec votre compte" : "Enregistré sur cet appareil";
+    if ($("#history-backdrop").hidden) return;
+    const list = filteredEntries();
+    const ul = $("#history-list");
+    if (!list.length) {
+      ul.innerHTML = `<li class="note">${journal.entries.length ? "Aucune réplique ne correspond à la recherche." : "Les répliques que vous consultez dans vos PDF s'affichent ici, avec leur traduction et la grammaire demandée."}</li>`;
+      return;
+    }
+    ul.innerHTML = list.map((e) => `
+      <li class="entry">
+        <p class="entry-en">${escapeHTML(e.en)}</p>
+        <p class="entry-fr">${escapeHTML(e.fr || "")}</p>
+        ${e.grammar ? `<details><summary>Grammaire</summary><div class="grammar">${markdown(e.grammar)}</div></details>` : ""}
+        <div class="entry-meta"><span>${escapeHTML(e.comic || "")} · p. ${Number(e.page) || 1} · ${new Date(e.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</span><span class="spacer"></span>
+        <button type="button" class="link-btn" data-del="${escapeHTML(e.id)}">Supprimer</button></div>
+      </li>`).join("");
+    ul.querySelectorAll("[data-del]").forEach((btn) => btn.addEventListener("click", () => {
+      if (btn.dataset.confirm) { deleteEntry(btn.dataset.del); return; }
+      btn.dataset.confirm = "1"; btn.textContent = "Confirmer la suppression";
+    }));
+  }
+
+  function openHistory() { $("#history-backdrop").hidden = false; $("#history-export").hidden = true; renderHistory(); $("#history-close").focus(); }
+  function closeHistory() { $("#history-backdrop").hidden = true; $("#history-btn").focus(); }
+
+  async function copyHistory() {
+    const text = historyText(filteredEntries());
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); $("#history-copy").textContent = "Copié"; setTimeout(() => { $("#history-copy").textContent = "Copier tout"; }, 1800); }
+    catch (e) { const box = $("#export-text"); box.value = text; $("#history-export").hidden = false; box.focus(); box.select(); }
+  }
+
+  // ---------- Fenêtre flottante ----------
+  const panel = $("#panel"), pill = $("#pill");
+  const isDocked = () => window.matchMedia("(max-width: 700px)").matches;
+  let geo = local.get("ac.panel", null);
+
+  function defaultGeo() {
+    const w = Math.min(400, window.innerWidth - 32), h = Math.min(560, window.innerHeight - 120);
+    return { x: window.innerWidth - w - 16, y: 76, w, h };
+  }
+  function clampGeo(g) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const w = Math.min(Math.max(300, g.w), vw - 16), h = Math.min(Math.max(240, g.h), vh - 16);
+    return { w, h, x: Math.min(Math.max(8, g.x), vw - w - 8), y: Math.min(Math.max(8, g.y), vh - h - 8) };
+  }
+  function applyGeo() {
+    if (isDocked()) { panel.style.left = panel.style.top = panel.style.width = panel.style.height = ""; return; }
+    geo = clampGeo(geo || defaultGeo());
+    panel.style.left = geo.x + "px"; panel.style.top = geo.y + "px"; panel.style.width = geo.w + "px"; panel.style.height = geo.h + "px";
+  }
+  function dragWith(handle, onMove) {
+    handle.addEventListener("pointerdown", (ev) => {
+      if (isDocked() || ev.target.closest("button")) return;
+      ev.preventDefault();
+      const start = { x: ev.clientX, y: ev.clientY, g: Object.assign({}, geo || defaultGeo()) };
+      handle.setPointerCapture(ev.pointerId);
+      const move = (e) => { geo = clampGeo(onMove(start, e.clientX - start.x, e.clientY - start.y)); applyGeo(); };
+      const up = () => { handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", up); handle.removeEventListener("pointercancel", up); local.set("ac.panel", geo); };
+      handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", up); handle.addEventListener("pointercancel", up);
+    });
+  }
+  dragWith($("#panel-head"), (s, dx, dy) => ({ x: s.g.x + dx, y: s.g.y + dy, w: s.g.w, h: s.g.h }));
+  dragWith($("#resize-handle"), (s, dx, dy) => ({ x: s.g.x, y: s.g.y, w: s.g.w + dx, h: s.g.h + dy }));
+
+  function showPanel() { panel.hidden = false; pill.hidden = true; local.set("ac.collapsed", false); applyGeo(); }
+  function hidePanel() { panel.hidden = true; pill.hidden = false; local.set("ac.collapsed", true); }
+
+  // ---------- Branchements ----------
+  $("#file-input").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; openFile(f); e.target.value = ""; });
+  $("#prev-page").addEventListener("click", () => goToPage(state.pageIndex - 1));
+  $("#next-page").addEventListener("click", () => goToPage(state.pageIndex + 1));
+  $("#analyze-btn").addEventListener("click", analyzePage);
+  $("#stop-btn").addEventListener("click", () => { if (state.controller) state.controller.abort(); });
+  $("#collapse-btn").addEventListener("click", hidePanel);
+  pill.addEventListener("click", showPanel);
+  $("#markers-toggle").addEventListener("click", () => {
+    state.showMarkers = !state.showMarkers; local.set("ac.markers", state.showMarkers);
+    $("#markers-toggle").setAttribute("aria-pressed", String(state.showMarkers)); renderMarkers();
+  });
+  $("#history-btn").addEventListener("click", openHistory);
+  $("#history-close").addEventListener("click", closeHistory);
+  $("#history-backdrop").addEventListener("click", (e) => { if (e.target === e.currentTarget) closeHistory(); });
+  $("#history-search").addEventListener("input", renderHistory);
+  $("#history-copy").addEventListener("click", copyHistory);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("#history-backdrop").hidden) { closeHistory(); return; }
+    if (e.target.closest("input, textarea")) return;
+    if (e.key === "ArrowLeft") goToPage(state.pageIndex - 1);
+    if (e.key === "ArrowRight") goToPage(state.pageIndex + 1);
+  });
+
+  // Glisser horizontalement sur la page pour tourner les pages.
+  let swipe = null;
+  stage.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse") swipe = { x: e.clientX, y: e.clientY, t: Date.now() }; });
+  stage.addEventListener("pointerup", (e) => {
+    if (!swipe) return; const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y, dt = Date.now() - swipe.t; swipe = null;
+    if (Math.abs(dx) > 60 && Math.abs(dy) < 60 && dt < 800) goToPage(state.pageIndex + (dx < 0 ? 1 : -1));
+  });
+  stage.addEventListener("pointercancel", () => { swipe = null; });
+
+  let resizeTimer = null;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { applyGeo(); renderPage().catch(showRenderError); }, 120); });
+
+  // ---------- Démarrage ----------
+  $("#markers-toggle").setAttribute("aria-pressed", String(state.showMarkers));
+  if (local.get("ac.collapsed", false)) hidePanel(); else showPanel();
+  updatePager(); renderPanel();
+  renderPage().catch(showRenderError);
+  if (document.fonts && document.fonts.load) {
+    Promise.all([document.fonts.load('700 30px "Comic Neue"'), document.fonts.load('400 120px "Bangers"')])
+      .then(() => { if (state.source === "sample") renderPage().catch(showRenderError); }).catch(() => {});
+  }
+  if (!window.pdfjsLib) setStatus("Le lecteur PDF n'a pas pu se charger : la page d'exemple reste disponible.", true);
+  offerResume();
+  initHistory();
+})();
+</script>

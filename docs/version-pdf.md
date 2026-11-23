@@ -39,6 +39,17 @@ Le **moteur d'analyse** est réutilisable tel quel pour la version Marvel si ell
 
 Tout le traitement est local. L'app ne fait aucun appel réseau, sauf le téléchargement éventuel des langues de traduction par iPadOS.
 
+## Problème connu : « Prewarm failed » sous iPadOS 27.2
+
+Sur certains iPad sous iPadOS 27.x, Swift Playgrounds 4.7 n'arrive à lancer **aucune** app. Même une app « Hello, world! » vide échoue. Le message est le suivant : « Prewarm failed — Vous n'avez pas l'autorisation d'enregistrer le fichier « CurrentUser.txt » dans le dossier « Documents » ».
+
+- C'est un bug d'Apple, suivi sous la référence FB24936489. Un ingénieur Apple indique sur les forums développeurs qu'il ne connaît **aucun contournement** (fils 848116, 856885 et 858001).
+- « Supprimer les données de l'app et redémarrer », réinstaller Swift Playgrounds ou réinitialiser l'iPad ne suffisent pas, d'après les utilisateurs touchés.
+- Quelques utilisateurs disent que l'iPadOS 27.3 bêta corrige le problème. Apple ne le confirme pas.
+- Le code de l'app n'est pas en cause : il compile sans erreur sur Mac avec Xcode 26 et Xcode 16 (workflow « Vérification sur Mac »).
+
+En attendant, la **version web** (`web/assistant-comics.html`, voir le README) offre les mêmes fonctions dans Safari ou l'app Claude.
+
 ## Installer et lancer sur l'iPad (gratuit)
 
 Prérequis : **Swift Playgrounds** (gratuit sur l'App Store), version 4.7 ou ultérieure de préférence, et iPadOS 18 ou ultérieur.

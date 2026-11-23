@@ -17,7 +17,19 @@ struct TranslationRunner: ViewModifier {
     func body(content: Content) -> some View {
         content
             .translationTask(configuration) { session in
-                await model.performPendingTranslations(using: session)
+                // La session reste dans cette closure (exigence de Swift 6) : seuls des textes en sortent.
+                let jobs = await model.takePendingJobs()
+                for (index, job) in jobs.enumerated() {
+                    do {
+                        let response = try await session.translate(job.text)
+                        await model.applyTranslation(job, text: response.targetText)
+                    } catch is CancellationError {
+                        await model.requeue(Array(jobs[index...]))
+                        return
+                    } catch {
+                        await model.failTranslation(job, message: error.localizedDescription)
+                    }
+                }
             }
             .onChange(of: model.translationTrigger) { _, _ in
                 if configuration == nil {

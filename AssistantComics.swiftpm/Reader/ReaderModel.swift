@@ -28,7 +28,8 @@ enum GrammarState: Equatable {
     case done(GrammarReport)
 }
 
-private struct TranslationJob {
+/// Une demande de traduction en attente (traitée par `TranslationRunner`).
+struct TranslationJob: Sendable {
     let key: String
     let text: String
     let page: Int
@@ -187,22 +188,26 @@ final class ReaderModel: ObservableObject {
         translationTrigger += 1
     }
 
-    /// Appelée par `TranslationRunner` avec une session valide.
-    func performPendingTranslations(using session: TranslationSession) async {
-        while !pendingJobs.isEmpty {
-            let job = pendingJobs.removeFirst()
-            do {
-                let response = try await session.translate(job.text)
-                translations[job.key] = .done(response.targetText)
-                history?.record(comic: comic.name, page: job.page, original: job.text,
-                                translation: response.targetText)
-            } catch is CancellationError {
-                pendingJobs.insert(job, at: 0)
-                return
-            } catch {
-                translations[job.key] = .failed(error.localizedDescription)
-            }
-        }
+    /// Demandes en attente, retirées de la file (la traduction est faite par `TranslationRunner`,
+    /// là où la session de traduction est valide).
+    func takePendingJobs() -> [TranslationJob] {
+        let jobs = pendingJobs
+        pendingJobs.removeAll()
+        return jobs
+    }
+
+    /// Remet des demandes interrompues en tête de file.
+    func requeue(_ jobs: [TranslationJob]) {
+        pendingJobs.insert(contentsOf: jobs, at: 0)
+    }
+
+    func applyTranslation(_ job: TranslationJob, text: String) {
+        translations[job.key] = .done(text)
+        history?.record(comic: comic.name, page: job.page, original: job.text, translation: text)
+    }
+
+    func failTranslation(_ job: TranslationJob, message: String) {
+        translations[job.key] = .failed(message)
     }
 
     // MARK: - Grammaire

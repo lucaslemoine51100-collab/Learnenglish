@@ -2,7 +2,14 @@
 
 Assistant pédagogique pour lire des comics en anglais sur iPad. Il détecte les bulles, traduit en français, explique la grammaire et garde un historique de progression.
 
-## Version actuelle : comics PDF (v0.1)
+## Version web (utilisable tout de suite sur l'iPad)
+
+- Page : https://claude.ai/artifact/Qyko2mrxB3pBNY2S3oVuqF (privée, réservée au propriétaire)
+- Source : [`web/assistant-comics.html`](web/assistant-comics.html)
+- Fonctionne dans Safari ou l'app Claude. Elle ouvre un PDF et l'affiche sur l'iPad. Quand vous appuyez sur « Analyser », Claude lit la page, numérote les bulles et les traduit. La grammaire est expliquée à la demande, et l'historique est enregistré avec votre compte.
+- Différence avec l'app : l'image de la page analysée est envoyée à Claude, uniquement sur demande.
+
+## App Swift Playgrounds : comics PDF (v0.1)
 
 App **Swift Playgrounds** : elle se lance gratuitement sur l'iPad, sans Mac.
 
