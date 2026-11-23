@@ -36,17 +36,44 @@ jobs:
         run: swift test
 
   app-build:
-    name: Compilation de l'app (simulateur iPad)
-    runs-on: macos-latest
+    # Swift Playgrounds n'utilise pas forcément le même SDK ni le même mode de langage que le Xcode le plus récent :
+    # on compile donc plusieurs variantes pour repérer les incompatibilités.
+    name: Compilation (${{ matrix.label }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: "Xcode récent, simulateur"
+            runner: macos-latest
+            xcode: "latest"
+            destination: "generic/platform=iOS Simulator"
+            extra: ""
+          - label: "Xcode 16, SDK iOS 18"
+            runner: macos-15
+            xcode: "16"
+            destination: "generic/platform=iOS Simulator"
+            extra: ""
+          - label: "Swift 6 strict, iPad réel"
+            runner: macos-latest
+            xcode: "latest"
+            destination: "generic/platform=iOS"
+            extra: "SWIFT_VERSION=6 SWIFT_STRICT_CONCURRENCY=complete"
     steps:
       - uses: actions/checkout@v5
-      - name: Choisir la version la plus récente de Xcode
+      - name: Choisir Xcode
         run: |
-          XCODE=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
+          ls -d /Applications/Xcode_*.app
+          if [ "${{ matrix.xcode }}" = "latest" ]; then
+            XCODE=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
+          else
+            XCODE=$(ls -d /Applications/Xcode_${{ matrix.xcode }}*.app | grep -v -i beta | sort -V | tail -1)
+          fi
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
-          xcodebuild -showsdks | grep -i iphonesimulator || true
+          swift --version
+          xcodebuild -showsdks | grep -i -E "iphoneos|iphonesimulator" || true
       - name: Lister les schémas
         working-directory: AssistantComics.swiftpm
         run: xcodebuild -list
@@ -55,12 +82,12 @@ jobs:
         run: |
           xcodebuild build \
             -scheme "Assistant Comics" \
-            -destination "generic/platform=iOS Simulator" \
+            -destination "${{ matrix.destination }}" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=NO ${{ matrix.extra }} \
             > "$RUNNER_TEMP/build.log" 2>&1 && STATUS=0 || STATUS=$?
           echo "::group::Erreurs et avertissements"
-          grep -E "error:|warning:" "$RUNNER_TEMP/build.log" | sort -u | head -200 || true
+          grep -E "error:|warning:" "$RUNNER_TEMP/build.log" | grep -v appintentsmetadataprocessor | sort -u | head -300 || true
           echo "::endgroup::"
-          tail -40 "$RUNNER_TEMP/build.log"
+          tail -25 "$RUNNER_TEMP/build.log"
           exit $STATUS
