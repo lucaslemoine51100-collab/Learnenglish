@@ -15,9 +15,10 @@ struct TranslationRunner: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content
-            .translationTask(configuration) { session in
-                // La session reste dans cette closure (exigence de Swift 6) : seuls des textes en sortent.
+        let model = self.model
+        return content
+            .translationTask(configuration) { @Sendable session in
+                // Closure non isolée : la session reste ici, seuls des textes passent vers le modèle (Swift 6).
                 let jobs = await model.takePendingJobs()
                 for (index, job) in jobs.enumerated() {
                     do {
